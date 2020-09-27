@@ -1,16 +1,27 @@
 var jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
-const sendgridTransport = require('nodemailer-sendgrid-transport');
-const transporter = nodemailer.createTransport({
-
-
-  service: 'gmail',
+const { google } = require("googleapis");
+const OAuth2 = google.auth.OAuth2;
+const myOAuth2Client = new OAuth2(
+  "936272359596-mnsmsk4dllo7h520863he1cg23npi4sa.apps.googleusercontent.com",
+  "OSewxTHq0koqnnIeAyWOPeCY",
+  "https://developers.google.com/oauthplayground"
+)
+myOAuth2Client.setCredentials({
+  refresh_token: "1//0f-Y_loEh-9vfCgYIARAAGA8SNwF-L9IrwU7LUQl7C9ePpt3xW3U4oayrcEW9zOq61gS-OC0Vvz1C--cv23nE5gxTUop-tTTnoQU"
+});
+const myAccessToken = myOAuth2Client.getAccessToken();
+const transport = nodemailer.createTransport({
+  service: "gmail",
   auth: {
-    user: 'vipin.kunam123@gmail.com',
-    pass: 'Saras96!'
+      type: "OAuth2",
+      user: "vipin.kunam123@gmail.com", //your gmail account you used to set the project up in google cloud console"
+      clientId: "936272359596-mnsmsk4dllo7h520863he1cg23npi4sa.apps.googleusercontent.com",
+      clientSecret: "OSewxTHq0koqnnIeAyWOPeCY",
+      refreshToken: "1//0f-Y_loEh-9vfCgYIARAAGA8SNwF-L9IrwU7LUQl7C9ePpt3xW3U4oayrcEW9zOq61gS-OC0Vvz1C--cv23nE5gxTUop-tTTnoQU",
+      accessToken: myAccessToken //access token variable we defined earlier
   }
-}
-);
+});
 const bcrypt = require('bcrypt');
 let checkuser = async (email) => {
   const usersRef = global.db.collection('users');
@@ -21,6 +32,24 @@ let checkuserbyno = async (phoneno) => {
   const usersRef = global.db.collection('users');
   let snapshot = await usersRef.where('phoneno', '==', phoneno).get();
   return snapshot;
+}
+exports.savetoken=async(req,res,next)=>{
+  console.log('in token')
+  let token=req.query.token;
+  let phoneno=req.query.phoneno;
+  console.log('pno',phoneno);
+  console.log('token',token);
+  let user=[];
+  let id=[];
+  let snapshot = await global.db.collection('users').where('phoneno', '==', phoneno.toString()).get();
+  snapshot.forEach(doc => {
+    id.push(doc.id);
+    console.log(doc.id, '=>', doc.data());
+    user.push(doc.data());
+  }); 
+  await db.collection('users').doc(id[0]).update({token: token});
+  res.status(201).json({ message: 'user updated' });
+
 }
 exports.signup = async (req, res, next) => {
   console.log('psted output', req.body);
@@ -37,16 +66,30 @@ exports.signup = async (req, res, next) => {
       let userdoc = {
         uname: user.uname,
         phoneno: user.phoneno,
-        email: user.email
+        email: user.email,
+        token:''
       }
       global.db.collection('users').add(userdoc).then((success) => {
         console.log('sucess');
-        transporter.sendMail({
-          to: user.email,
-          from: 'donotreply@node-complete.com',
-          subject: 'Signup succeeded!',
-          html: `<h1>Welcome to chatapp ${user.email}</h1>`
-        });      
+        const mailOptions = {
+          from: 'vipin.kunam123@gmail.com', // sender
+          to: user.email, // receiver
+          subject: 'Welcome to Chatapp', // Subject
+          html: `<p>Thank you for joining  ${user.uname}</p>`// html body
+      }
+      transport.sendMail(mailOptions, function (err, result) {
+          if (err) {
+              // res.send({
+              //     message: err
+              // })
+              console.log('error sending email');
+          } else {
+              transport.close();
+              // res.send({
+              //     message: 'Email has been sent: check your inbox!'
+              // })
+          }
+      })  
         res.status(201).json({ message: 'user created' });
       }, (err) => {
         next(err);

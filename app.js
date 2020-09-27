@@ -6,6 +6,7 @@ const Firestore = require('@google-cloud/firestore');
 const signupandloginroute=require('./routes/signupandlogin');
 const contactroute=require('./routes/contacts');
 const contactcontroller=require('./Controllers/Contactscontroller');
+const notify=require('./Controllers/NotificationController');
 global.db = new Firestore({
    projectId: 'vipin-287009',
    keyFilename: './Vipin-b732a8dc8a29.json',
@@ -24,17 +25,19 @@ global.db = new Firestore({
    });
  app.use('/',signupandloginroute);
  app.use('/contacts',contactroute);
+ app.post('/fcm')
 io.on('connection', function(socket) {
    console.log('A user connected');
   
    socket.on('fromclient', function(data) {
+    
  contactcontroller.insertintodb(data).then((res)=>{
   io.emit(data.listening,{...data,id:res.id});
   io.emit(data.to,{...data,id:res.id});
  })
     
      
-     
+ notify.pushnotify(data['from'],data.to)    
    })
 socket.on('ack',function(data){
   contactcontroller.deletemessage(data.id);
